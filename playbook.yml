@@ -1,0 +1,52 @@
+---
+- name: Install required packages and launch Docker Compose
+  hosts: all
+  become: yes
+  vars:
+    mysql_password: "secretpassword"
+
+  tasks:
+
+    - name: Install Python
+      apt:
+        name: python3
+        state: present
+        # update_cache: yes
+
+    - name: Install pip
+      apt:
+        name: python3-pip
+        state: present
+        # update_cache: yes
+
+
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+        # update_cache: yes
+
+    - name: Install Docker Compose
+      apt:
+        name: docker-compose
+        state: present
+        # update_cache: yes
+
+    - name: Copy docker-compose.yml
+      template:
+        src: ./docker-compose.yml.j2
+        dest: /home/docker-compose.yml
+
+    - name: Stop and remove existing containers
+      docker_compose:
+        project_src: /home/
+        state: absent
+
+    - name: Launch Docker Compose
+      docker_compose:
+        project_src: /home/        
+        state: present
+        restarted: true
+        build: yes
+        remove_orphans: yes
+        recreate: always
