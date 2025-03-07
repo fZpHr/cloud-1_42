@@ -1,82 +1,125 @@
 ---
-- name: Install required packages and launch Docker Compose
+- name: Install Docker and Docker Compose manually
   hosts: all
   become: yes
-  vars:
-    mysql_password: "secretpassword"
+  vars_files:
+    - secrets.yml
 
   tasks:
 
-  #REQUIRED PACKAGES
-    - name: Install Python
+    # Mettre à jour le cache apt
+    - name: Update apt cache
       apt:
-        name: python3
-        state: present
-        # update_cache: yes
+        update_cache: yes
 
-    - name: Install pip
+    # Installer les dépendances de base pour Docker (curl, ca-certificates, etc.)
+    - name: Install required dependencies for Docker
+      apt:
+        name:
+          - curl
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    # Installer pip3 si nécessaire
+    - name: Install pip3
       apt:
         name: python3-pip
         state: present
-        # update_cache: yes
 
+    # Télécharger et installer Docker en utilisant le script officiel
+    - name: Install Docker using the official installation script
+      shell: |
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sh get-docker.sh
+      args:
+        creates: /usr/bin/docker
 
-    - name: Install Docker
-      apt:
-        name: docker.io
+    # Installer la bibliothèque Docker pour Python
+    - name: Install Docker Python library
+      pip:
+        name: docker==4.4.4  # Spécifier la version pour résoudre le problème de SSL
         state: present
-        # update_cache: yes
 
-    - name: Install Docker Compose
-      apt:
+    # Installer la bibliothèque Docker Compose pour Python
+    - name: Install docker-compose Python library
+      pip:
         name: docker-compose
         state: present
-        # update_cache: yes
 
+    # Vérifier que Docker a été installé avec succès
+    - name: Verify Docker installation
+      command: docker --version
+      register: docker_version
+      changed_when: false
 
-  #COPY DOCKER COMPOSE ON REMOTE HOST
+    - name: Show Docker version
+      debug:
+        msg: "Docker version installed: {{ docker_version.stdout }}"
+
+    # Télécharger Docker Compose manuellement depuis GitHub
+    - name: Install Docker Compose manually
+      shell: |
+        curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        chmod +x /usr/local/bin/docker-compose
+      args:
+        creates: /usr/local/bin/docker-compose
+
+    # Vérifier que Docker Compose a été installé
+    - name: Verify Docker Compose version
+      command: docker-compose --version
+      register: docker_compose_version
+      changed_when: false
+
+    - name: Show Docker Compose version
+      debug:
+        msg: "Docker Compose version installed: {{ docker_compose_version.stdout }}"
+
+    # Copier le fichier docker-compose.yml dans /home/
     - name: Copy docker-compose.yml
       template:
         src: ./docker-compose.yml.j2
         dest: /home/docker-compose.yml
 
+    # Nettoyer tous les containers Docker, images, volumes et réseaux
+    - name: Clean up all Docker containers, images, volumes, and networks
+      block:
+        - name: Stop all containers and remove them
+          command: /usr/local/bin/docker-compose down -v
+          args:
+            chdir: /home/
+          ignore_errors: yes
 
-  #REMOVE ALL DOCKER CONTAINERS IF ANY
-    - name: Stop all containers
-      command: docker-compose down -v
-      args:
-        chdir: /home/
-      ignore_errors: yes
+        - name: Remove all unused Docker images
+          command: docker rmi $(docker images -q)
+          args:
+            chdir: /home/
+          ignore_errors: yes
 
-    - name: Remove all unused images
-      command: docker rmi $(docker images -q)
-      args:
-        chdir: /home/
-      ignore_errors: yes
+        - name: Prune unused Docker volumes
+          command: docker volume prune -f
+          args:
+            chdir: /home/
+          ignore_errors: yes
 
-    - name: Prune unused volumes
-      command: docker volume prune -f
-      args:
-        chdir: /home/
-      ignore_errors: yes
+        - name: Prune unused Docker networks
+          command: docker network prune -f
+          args:
+            chdir: /home/
+          ignore_errors: yes
 
-    - name: Prune unused networks
-      command: docker network prune -f
-      args:
-        chdir: /home/
-      ignore_errors: yes
+        - name: Prune stopped Docker containers
+          command: docker container prune -f
+          args:
+            chdir: /home/
+          ignore_errors: yes
 
-    - name: Prune stopped containers
-      command: docker container prune -f
-      args:
-        chdir: /home/
-      ignore_errors: yes
-
-
-  #LAUNCH DOCKER COMPOSE
+    # Lancer Docker Compose
     - name: Launch Docker Compose
       docker_compose:
-        project_src: /home/        
+        project_src: /home/
         state: present
         restarted: true
         build: yes
