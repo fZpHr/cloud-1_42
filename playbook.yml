@@ -7,6 +7,7 @@
 
   tasks:
 
+  #REQUIRED PACKAGES
     - name: Install Python
       apt:
         name: python3
@@ -32,16 +33,47 @@
         state: present
         # update_cache: yes
 
+
+  #COPY DOCKER COMPOSE ON REMOTE HOST
     - name: Copy docker-compose.yml
       template:
         src: ./docker-compose.yml.j2
         dest: /home/docker-compose.yml
 
-    - name: Stop and remove existing containers
-      docker_compose:
-        project_src: /home/
-        state: absent
 
+  #REMOVE ALL DOCKER CONTAINERS IF ANY
+    - name: Stop all containers
+      command: docker-compose down -v
+      args:
+        chdir: /home/
+      ignore_errors: yes
+
+    - name: Remove all unused images
+      command: docker rmi $(docker images -q)
+      args:
+        chdir: /home/
+      ignore_errors: yes
+
+    - name: Prune unused volumes
+      command: docker volume prune -f
+      args:
+        chdir: /home/
+      ignore_errors: yes
+
+    - name: Prune unused networks
+      command: docker network prune -f
+      args:
+        chdir: /home/
+      ignore_errors: yes
+
+    - name: Prune stopped containers
+      command: docker container prune -f
+      args:
+        chdir: /home/
+      ignore_errors: yes
+
+
+  #LAUNCH DOCKER COMPOSE
     - name: Launch Docker Compose
       docker_compose:
         project_src: /home/        

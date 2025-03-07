@@ -1,17 +1,6 @@
 services:
-  wordpress:
-    image: wordpress
-    container_name: wordpress
-    ports:
-      - "8080:80"
-    environment:
-      WORDPRESS_DB_HOST: mysql:3306
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DB_USER: wp_user
-      WORDPRESS_DB_PASSWORD: "{{ mysql_password }}"
-
   mysql:
-    image: mysql:5.7
+    image: mysql
     container_name: mysql
     environment:
       MYSQL_ROOT_PASSWORD: "{{ mysql_password }}"
@@ -24,11 +13,59 @@ services:
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: phpmyadmin
-    ports:
-      - "8081:80"
+    depends_on:
+      - mysql
     environment:
       PMA_HOST: mysql
       MYSQL_ROOT_PASSWORD: "{{ mysql_password }}"
+      VIRTUAL_HOST: phpmyadmin.local
+      LETSENCRYPT_HOST: phpmyadmin.local
+      LETSENCRYPT_EMAIL: your-email@example.com
+    expose:
+      - "81"
+
+  wordpress:
+    image: wordpress
+    container_name: wordpress
+    depends_on:
+      - mysql
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: "{{ mysql_password }}"
+      VIRTUAL_HOST: wordpress.local
+      LETSENCRYPT_HOST: wordpress.local
+      LETSENCRYPT_EMAIL: your-email@example.com
+    expose:
+      - "80"
+
+  nginx:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    environment:
+      DEFAULT_HOST: wordpress.local
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./certificates:/etc/nginx/certs
+      - ./html:/usr/share/nginx/html
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - wordpress
+      - phpmyadmin
+
+  nginx-letsencrypt:
+    image: nginxproxy/acme-companion
+    container_name: nginx-lets-encrypt
+    environment:
+      - DEFAULT_EMAIL=your-email@example.com
+    volumes:
+      - ./certificates:/etc/letsencrypt
+      - ./config:/etc/acme.sh
+    depends_on:
+      - nginx
 
 volumes:
   mysql-data:

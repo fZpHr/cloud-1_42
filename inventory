@@ -1,2 +1,2 @@
 [web_servers]
-10.12.248.198 ansible_user=root ansible_ssh_pass=*********
+10.11.248.219 ansible_user=root ansible_ssh_pass=etag
