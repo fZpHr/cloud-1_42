@@ -1,127 +1,79 @@
 ---
-- name: Install Docker and Docker Compose manually
+- name: Deploy Docker Stack with Auto-TLS
   hosts: all
   become: yes
   vars_files:
     - secrets.yml
 
   tasks:
+    - name: Ensure SSL certs directory exists
+      file:
+        path: /home/certs
+        state: directory
+        mode: 0755
 
-    # Mettre à jour le cache apt
-    - name: Update apt cache
-      apt:
-        update_cache: yes
+    - name: Generate default SSL certs (fallback)
+      command: >
+        openssl req -x509 -newkey rsa:4096 -keyout /home/certs/key.pem -out /home/certs/cert.pem
+        -days 365 -nodes -subj "/CN=*"
+      args:
+        creates: /home/certs/cert.pem
 
-    # Installer les dépendances de base pour Docker (curl, ca-certificates, etc.)
-    - name: Install required dependencies for Docker
+    - name: Clean existing Python packages
+      pip:
+        name:
+          - docker
+          - docker-compose
+          - urllib3
+          - chardet
+          - requests
+        state: absent
+
+    - name: Install system dependencies
       apt:
         name:
           - curl
           - ca-certificates
           - gnupg
           - lsb-release
+          - python3-pip
         state: present
         update_cache: yes
 
-    # Installer pip3 si nécessaire
-    - name: Install pip3
-      apt:
-        name: python3-pip
-        state: present
-
-    # Télécharger et installer Docker en utilisant le script officiel
-    - name: Install Docker using the official installation script
+    - name: Install Docker
       shell: |
         curl -fsSL https://get.docker.com -o get-docker.sh
         sh get-docker.sh
       args:
         creates: /usr/bin/docker
 
-    # Installer la bibliothèque Docker pour Python
-    - name: Install Docker Python library
+    - name: Install Python requirements
       pip:
-        name: docker==4.4.4  # Spécifier la version pour résoudre le problème de SSL
+        name:
+          - "docker==5.0.3"
+          - "docker-compose==1.29.2"
+          - "urllib3==1.26.6"
+          - "chardet==3.0.4"
+          - "requests==2.25.1"
         state: present
+        extra_args: --force-reinstall
 
-    # Installer la bibliothèque Docker Compose pour Python
-    - name: Install docker-compose Python library
-      pip:
-        name: docker-compose
+    - name: Copy nginx.conf
+      copy:
+        src: ./nginx.conf
+        dest: /home/nginx.conf
+        mode: 0644
+
+    - name: Update hosts file
+      lineinfile:
+        path: /etc/hosts
+        line: "127.0.0.1 mylocal.test pma.mylocal.test"
         state: present
-
-    # Vérifier que Docker a été installé avec succès
-    - name: Verify Docker installation
-      command: docker --version
-      register: docker_version
-      changed_when: false
-
-    - name: Show Docker version
-      debug:
-        msg: "Docker version installed: {{ docker_version.stdout }}"
-
-    # Télécharger Docker Compose manuellement depuis GitHub
-    - name: Install Docker Compose manually
-      shell: |
-        curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-        chmod +x /usr/local/bin/docker-compose
-      args:
-        creates: /usr/local/bin/docker-compose
-
-    # Vérifier que Docker Compose a été installé
-    - name: Verify Docker Compose version
-      command: docker-compose --version
-      register: docker_compose_version
-      changed_when: false
-
-    - name: Show Docker Compose version
-      debug:
-        msg: "Docker Compose version installed: {{ docker_compose_version.stdout }}"
-
-    # Copier le fichier docker-compose.yml dans /home/
-    - name: Copy docker-compose.yml
-      template:
-        src: ./docker-compose.yml.j2
-        dest: /home/docker-compose.yml
-
-    # Nettoyer tous les containers Docker, images, volumes et réseaux
-    - name: Clean up all Docker containers, images, volumes, and networks
-      block:
-        - name: Stop all containers and remove them
-          command: /usr/local/bin/docker-compose down -v
-          args:
-            chdir: /home/
-          ignore_errors: yes
-
-        - name: Remove all unused Docker images
-          command: docker rmi $(docker images -q)
-          args:
-            chdir: /home/
-          ignore_errors: yes
-
-        - name: Prune unused Docker volumes
-          command: docker volume prune -f
-          args:
-            chdir: /home/
-          ignore_errors: yes
-
-        - name: Prune unused Docker networks
-          command: docker network prune -f
-          args:
-            chdir: /home/
-          ignore_errors: yes
-
-        - name: Prune stopped Docker containers
-          command: docker container prune -f
-          args:
-            chdir: /home/
-          ignore_errors: yes
-
-    # Lancer Docker Compose
-    - name: Launch Docker Compose
-      docker_compose:
+    
+    - name: Deploy docker-compose stack
+      community.docker.docker_compose:
         project_src: /home/
-        state: present
-        restarted: true
         build: yes
-        remove_orphans: yes
+        restarted: yes
         recreate: always
+        remove_orphans: yes

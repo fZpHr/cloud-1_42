@@ -1,0 +1,63 @@
+services:
+  # mysql:
+  #   image: mysql:5.7
+  #   command: --explicit_defaults_for_timestamp=1
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: "{{ mysql_password }}"
+  #     MYSQL_DATABASE: wordpress
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   networks:
+  #     - backend
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "mysqladmin ping -uroot -p{{ mysql_password | urlencode }}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # wordpress:
+  #   image: wordpress:5.9
+  #   environment:
+  #     WORDPRESS_DB_HOST: mysql:3306
+  #     WORDPRESS_DB_USER: root
+  #     WORDPRESS_DB_PASSWORD: "{{ mysql_password }}"
+  #   volumes:
+  #     - wordpress_data:/var/www/html
+  #   networks:
+  #     - backend
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+
+  # phpmyadmin:
+  #   image: phpmyadmin/phpmyadmin:5.1
+  #   environment:
+  #     PMA_HOST: mysql
+  #     MYSQL_ROOT_PASSWORD: "{{ mysql_password }}"
+  #   networks:
+  #     - backend
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - backend
+    # depends_on:
+    #   - wordpress
+    #   - phpmyadmin
+
+# volumes:
+#   mysql_data:
+#   wordpress_data:
+
+networks:
+  backend:
+    driver: bridge
