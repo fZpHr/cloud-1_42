@@ -19,15 +19,15 @@
       args:
         creates: /home/certs/cert.pem
 
-    - name: Clean existing Python packages
-      pip:
-        name:
-          - docker
-          - docker-compose
-          - urllib3
-          - chardet
-          - requests
-        state: absent
+    # - name: Clean existing Python packages
+    #   pip:
+    #     name:
+    #       - docker
+    #       - docker-compose
+    #       - urllib3
+    #       - chardet
+    #       - requests
+    #     state: absent
 
     - name: Install system dependencies
       apt:
@@ -63,7 +63,12 @@
         src: ./nginx.conf
         dest: /home/nginx.conf
         mode: 0644
-
+    - name: Copy docker-compose.yml
+      copy:
+        src: ./docker-compose.yml.j2
+        dest: /home/docker-compose.yml
+        mode: 0644
+      
     - name: Update hosts file
       lineinfile:
         path: /etc/hosts
