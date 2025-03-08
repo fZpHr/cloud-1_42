@@ -8,12 +8,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
-      - backend
-    # healthcheck:
-    #   test: ["CMD-SHELL", "mysqladmin ping -uroot -p{{ mysql_password | urlencode }}"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
+      - cloud1
 
   wordpress:
     image: wordpress:5.9
@@ -24,10 +19,9 @@ services:
     volumes:
       - wordpress_data:/var/www/html
     networks:
-      - backend
+      - cloud1
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:5.1
@@ -35,10 +29,9 @@ services:
       PMA_HOST: mysql
       MYSQL_ROOT_PASSWORD: "{{ mysql_password }}"
     networks:
-      - backend
+      - cloud1
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
 
   nginx:
     image: nginx:alpine
@@ -49,7 +42,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/nginx/certs:ro
     networks:
-      - backend
+      - cloud1
     depends_on:
       - wordpress
       - phpmyadmin
@@ -59,5 +52,5 @@ volumes:
   wordpress_data:
 
 networks:
-  backend:
+  cloud1:
     driver: bridge

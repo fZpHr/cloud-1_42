@@ -19,16 +19,6 @@
       args:
         creates: /home/certs/cert.pem
 
-    # - name: Clean existing Python packages
-    #   pip:
-    #     name:
-    #       - docker
-    #       - docker-compose
-    #       - urllib3
-    #       - chardet
-    #       - requests
-    #     state: absent
-
     - name: Install system dependencies
       apt:
         name:
@@ -72,7 +62,7 @@
     - name: Update hosts file
       lineinfile:
         path: /etc/hosts
-        line: "127.0.0.1 mylocal.test pma.mylocal.test"
+        line: "127.0.0.1 wordpress.cloud-1 phpmyadmin.cloud-1"
         state: present
     
     - name: Deploy docker-compose stack
