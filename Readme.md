@@ -1,3 +1,9 @@
+# Cloud_1
+
+This project automates the deployment of a cloud server using Ansible. I learn how to configure and manage infrastructures, deploy applications on remote servers, and ensure consistent environments through configuration management.
+
+
+# Commands
 nix-shell -p ansible
 
 nix-env -iA nixpkgs.sshpass
